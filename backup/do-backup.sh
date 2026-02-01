@@ -35,22 +35,6 @@ else
   S3_PREFIX="/${S3_PREFIX}"
 fi
 
-if [ "$SCHEDULE" = "**None**" ]; then
-  exec /do-backup.sh
-else
-  apk add --no-cache dcron
-  echo "$SCHEDULE root /bin/sh /do-backup.sh" > /etc/crontabs/root
-  crond -f -l 2
-fi
-
-POSTGRES_HOST_OPTS="-h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER $POSTGRES_EXTRA_OPTS"
-
-if [ -z "$S3_PREFIX" ]; then
-  S3_PREFIX=""
-else
-  S3_PREFIX="/${S3_PREFIX}"
-fi
-
 if [ "$POSTGRES_BACKUP_ALL" = "true" ]; then
   SRC_FILE=dump.sql.gz
   DEST_FILE=all_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
