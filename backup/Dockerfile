@@ -15,8 +15,8 @@ RUN ARCH=$(uname -m) && \
         echo "Unsupported architecture: $ARCH"; \
         exit 1; \
     fi && \
-    unzip awscliv2.zip && \
-    chmod +x ./aws && \
+    unzip -q awscliv2.zip && \
+    chmod +x aws && \
     ./aws install && \
     rm -rf aws awscliv2.zip
 
