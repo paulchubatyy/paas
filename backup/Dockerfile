@@ -4,10 +4,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     gzip \
     unzip \
-    python3-pip \
+    awscli \
     && rm -rf /var/lib/apt/lists/*
-
-RUN pip3 install --no-cache-dir awscli
 
 COPY backup.sh /backup.sh
 COPY do-backup.sh /do-backup.sh
