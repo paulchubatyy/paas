@@ -3,7 +3,12 @@ FROM postgres:18
 RUN apt-get update && apt-get install -y \
     curl \
     gzip \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws install
 
 COPY backup.sh /backup.sh
 COPY do-backup.sh /do-backup.sh
