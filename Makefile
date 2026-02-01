@@ -1,3 +1,5 @@
+.PHONY: .env deploy gen-admin-auth set-admin-auth backup restore
+
 .env:
 	cp example.env .env
 
