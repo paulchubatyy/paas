@@ -78,7 +78,8 @@ services:
       retries: 5
 
   postgres-backup:
-    image: schickling/postgres-backup-s3
+    build: ./backup
+    image: paas-backup:18
     container_name: postgres-backup
     restart: unless-stopped
     depends_on:
@@ -110,7 +111,8 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT}
 
   postgres-restore:
-    image: schickling/postgres-restore-s3
+    build: ./backup
+    image: paas-backup:18
     container_name: postgres-restore
     restart: "no"
     profiles:
@@ -137,6 +139,7 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_PREFIX: ${S3_PREFIX:-backup}
       ENCRYPTION_PASSWORD: ${ENCRYPTION_PASSWORD}
+    entrypoint: ["/bin/sh", "/restore.sh"]
 
 volumes:
   postgres_data:

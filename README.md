@@ -116,7 +116,7 @@ services:
 - `make .env` - Copy environment template
 - `make gen-admin-auth USER=admin PASS=secret` - Generate admin credentials
 - `make set-admin-auth USER=admin PASS=secret` - Update admin credentials in `.env`
-- `make deploy` - Deploy docker-compose.yml, .env, and Makefile to remote server (set `SERVER` and `REMOTE_PATH`)
+- `make deploy` - Deploy docker-compose.yml, .env, Makefile, and backup/ to remote server (set `SERVER` and `REMOTE_PATH`)
 - `make backup` - Trigger an immediate manual backup to S3
 - `make restore` - Restore database from latest S3 backup
 
@@ -168,7 +168,7 @@ Set `DROP_PUBLIC=yes` in `.env` to drop existing schema before restore (default)
 - **traefik** - Reverse proxy with automatic HTTPS
 - **postgres** - PostgreSQL 18 database
 - **valkey** - Redis-compatible cache
-- **postgres-backup** - Automated S3 backups
+- **postgres-backup** - Custom backup service (built from `backup/`) for automated S3 backups
 - **postgres-restore** - On-demand restore from S3 (run with `make restore`)
 
 ## Security
