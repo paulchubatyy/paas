@@ -30,7 +30,7 @@ backup:
 	@echo "S3 Bucket: $$(grep '^S3_BUCKET=' .env | cut -d'=' -f2)"
 	@echo "S3 Prefix: $$(grep '^S3_PREFIX=' .env | cut -d'=' -f2)"
 	@echo ""
-	@docker compose run -e SCHEDULE= --rm postgres-backup
+	@docker compose run -e SCHEDULE='**None**' --rm postgres-backup
 	@echo "✓ Backup completed"
 
 restore:
