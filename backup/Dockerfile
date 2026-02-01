@@ -4,21 +4,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     gzip \
     unzip \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then \
-        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"; \
-    elif [ "$ARCH" = "aarch64" ]; then \
-        curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"; \
-    else \
-        echo "Unsupported architecture: $ARCH"; \
-        exit 1; \
-    fi && \
-    unzip -q awscliv2.zip && \
-    chmod +x aws && \
-    ./aws install && \
-    rm -rf aws awscliv2.zip
+RUN pip3 install --no-cache-dir awscli
 
 COPY backup.sh /backup.sh
 COPY do-backup.sh /do-backup.sh
