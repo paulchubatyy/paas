@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip" && \
     unzip awscliv2.zip && \
+    chmod +x ./aws && \
     ./aws install
 
 COPY backup.sh /backup.sh
