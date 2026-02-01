@@ -1,0 +1,45 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: mixed-line-ending
+      - id: check-vcs-permalinks
+
+  - repo: local
+    hooks:
+      - id: no-env-files
+        name: Prevent committing .env files
+        entry: found .env file! These contain secrets and should not be committed.
+        language: fail
+        files: '^\.env$'
+
+      - id: check-docker-compose-valid
+        name: Validate docker-compose.yml
+        entry: docker compose -f docker-compose.yml config
+        language: system
+        files: docker-compose\.yml$
+        pass_filenames: false
+
+      - id: check-makefile-tabs
+        name: Check Makefile uses tabs
+        entry: bash -c 'if grep -q "^  " Makefile; then echo "Makefile must use tabs, not spaces"; exit 1; fi'
+        language: system
+        files: Makefile$
+        pass_filenames: false
+
+      - id: check-hardcoded-passwords
+        name: Check for hardcoded passwords in docker-compose
+        entry: bash -c 'if grep -i -E "(password|secret|key|token)\s*[=:]\s*["'"'"'][^"'"'"']+["'"'"']" docker-compose.yml; then echo "Potential hardcoded password found!"; exit 1; fi'
+        language: system
+        files: docker-compose\.yml$
+        pass_filenames: false
