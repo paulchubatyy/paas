@@ -4,10 +4,30 @@ set -e
 if [ "$SCHEDULE" = "**None**" ]; then
   echo "Running one-time backup..."
   exec /do-backup.sh
-else
-  echo "Setting up scheduled backup: $SCHEDULE"
-  apt-get update && apt-get install -y cron
-  echo "$SCHEDULE root /bin/sh /do-backup.sh >> /var/log/backup.log 2>&1" > /etc/cron.d/backup
-  chmod 0644 /etc/cron.d/backup
-  cron -f
 fi
+
+# Convert schedule to seconds
+case "$SCHEDULE" in
+  @yearly|@annually) INTERVAL=31536000 ;;
+  @monthly)          INTERVAL=2592000 ;;
+  @weekly)           INTERVAL=604800 ;;
+  @daily|@midnight)  INTERVAL=86400 ;;
+  @hourly)           INTERVAL=3600 ;;
+  @every_minute)     INTERVAL=60 ;;
+  *)
+    echo "Unsupported schedule: $SCHEDULE (use @daily, @hourly, @weekly, @monthly, or @yearly)"
+    exit 1
+    ;;
+esac
+
+echo "Backup schedule: $SCHEDULE (every ${INTERVAL}s)"
+echo "Running initial backup..."
+/do-backup.sh
+
+echo "Scheduler started. Next backup in ${INTERVAL}s..."
+while true; do
+  sleep "$INTERVAL"
+  echo "Running scheduled backup..."
+  /do-backup.sh
+  echo "Next backup in ${INTERVAL}s..."
+done
