@@ -277,6 +277,13 @@ start_services() {
     (cd "$INSTALL_PATH" && sudo docker compose up -d)
 
     log "Services started"
+
+    # Daily cron to prune unused images older than 14 days
+    local cron_job="0 3 * * * docker image prune -af --filter 'until=336h' >/dev/null 2>&1"
+    if ! crontab -l 2>/dev/null | grep -qF "docker image prune"; then
+        (crontab -l 2>/dev/null; echo "$cron_job") | crontab -
+        log "Added daily Docker image cleanup cron (images unused >14 days)"
+    fi
 }
 
 # --- Post-install summary ---
