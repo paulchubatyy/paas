@@ -146,13 +146,13 @@ prompt_config() {
     echo ""
 
     ask "Admin dashboard domain (e.g. admin.example.com): " ADMIN_HOSTNAME
-    [ -z "$ADMIN_HOSTNAME" ] && fatal "Domain is required."
+    if [ -z "$ADMIN_HOSTNAME" ]; then fatal "Domain is required."; fi
     if ! [[ "$ADMIN_HOSTNAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$ ]]; then
         fatal "Invalid domain: $ADMIN_HOSTNAME"
     fi
 
     ask "Email for Let's Encrypt certificates: " ADMIN_EMAIL
-    [ -z "$ADMIN_EMAIL" ] && fatal "Email is required."
+    if [ -z "$ADMIN_EMAIL" ]; then fatal "Email is required."; fi
     if ! [[ "$ADMIN_EMAIL" =~ @ ]]; then
         fatal "Invalid email: $ADMIN_EMAIL"
     fi
@@ -170,18 +170,18 @@ prompt_config() {
             ask "PostgreSQL user [postgres]: " PG_USER
             PG_USER="${PG_USER:-postgres}"
             ask_secret "PostgreSQL password: " PG_PASS
-            [ -z "$PG_PASS" ] && fatal "Password is required."
+            if [ -z "$PG_PASS" ]; then fatal "Password is required."; fi
             ask "PostgreSQL database [postgres]: " PG_DB
             PG_DB="${PG_DB:-postgres}"
             ;;
         2|mariadb|mysql)
             DB_TYPE="mariadb"
             ask_secret "MariaDB root password: " MYSQL_ROOT_PASS
-            [ -z "$MYSQL_ROOT_PASS" ] && fatal "Root password is required."
+            if [ -z "$MYSQL_ROOT_PASS" ]; then fatal "Root password is required."; fi
             ask "MariaDB user [mariadb]: " MYSQL_USER
             MYSQL_USER="${MYSQL_USER:-mariadb}"
             ask_secret "MariaDB user password: " MYSQL_PASS
-            [ -z "$MYSQL_PASS" ] && fatal "Password is required."
+            if [ -z "$MYSQL_PASS" ]; then fatal "Password is required."; fi
             ask "MariaDB database [app]: " MYSQL_DB
             MYSQL_DB="${MYSQL_DB:-app}"
             ;;
@@ -195,7 +195,7 @@ prompt_config() {
     ask "Admin username [admin]: " ADMIN_USER
     ADMIN_USER="${ADMIN_USER:-admin}"
     ask_secret "Admin password: " ADMIN_PASS
-    [ -z "$ADMIN_PASS" ] && fatal "Admin password is required."
+    if [ -z "$ADMIN_PASS" ]; then fatal "Admin password is required."; fi
 }
 
 # --- Download project files ---
