@@ -25,56 +25,100 @@ if [ -n "$S3_ENDPOINT" ]; then
   AWS_ARGS="--endpoint-url $S3_ENDPOINT"
 fi
 
-export PGPASSWORD=$POSTGRES_PASSWORD
-
-POSTGRES_HOST_OPTS="-h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER $POSTGRES_EXTRA_OPTS"
-
 if [ -z "$S3_PREFIX" ]; then
   S3_PREFIX=""
 else
   S3_PREFIX="/${S3_PREFIX}"
 fi
 
-if [ "$POSTGRES_BACKUP_ALL" = "true" ]; then
-  SRC_FILE=dump.sql.gz
-  DEST_FILE=all_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
+case "$DB_TYPE" in
+  postgres)
+    export PGPASSWORD=$DB_PASSWORD
+    HOST_OPTS="-h $DB_HOST -p $DB_PORT -U $DB_USER $EXTRA_OPTS"
 
-  echo "Creating dump of all databases from ${POSTGRES_HOST}..."
-  pg_dumpall $POSTGRES_HOST_OPTS | gzip > $SRC_FILE
+    if [ "$BACKUP_ALL" = "true" ]; then
+      SRC_FILE=dump.sql.gz
+      DEST_FILE=all_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
 
-  if [ -n "$ENCRYPTION_PASSWORD" ]; then
-    echo "Encrypting ${SRC_FILE}"
-    openssl enc -aes-256-cbc -in $SRC_FILE -out ${SRC_FILE}.enc -k $ENCRYPTION_PASSWORD
-    rm $SRC_FILE
-    SRC_FILE="${SRC_FILE}.enc"
-    DEST_FILE="${DEST_FILE}.enc"
-  fi
+      echo "Creating dump of all databases from ${DB_HOST}..."
+      pg_dumpall $HOST_OPTS | gzip > $SRC_FILE
+    else
+      for DB in $(echo $DB_NAME | tr "," "\n"); do
+        SRC_FILE=dump.sql.gz
+        DEST_FILE=${DB}_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
 
-  echo "Uploading dump to $S3_BUCKET"
-  aws $AWS_ARGS s3 cp $SRC_FILE "s3://${S3_BUCKET}${S3_PREFIX}/${DEST_FILE}"
+        echo "Creating dump of ${DB} database from ${DB_HOST}..."
+        pg_dump $HOST_OPTS $DB | gzip > $SRC_FILE
 
-  echo "SQL backup uploaded successfully"
-  rm -rf $SRC_FILE
-else
-  for DB in $(echo $POSTGRES_DATABASE | tr "," "\n"); do
-    SRC_FILE=dump.sql.gz
-    DEST_FILE=${DB}_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
+        if [ -n "$ENCRYPTION_PASSWORD" ]; then
+          echo "Encrypting ${SRC_FILE}"
+          openssl enc -aes-256-cbc -in $SRC_FILE -out ${SRC_FILE}.enc -k $ENCRYPTION_PASSWORD
+          rm $SRC_FILE
+          SRC_FILE="${SRC_FILE}.enc"
+          DEST_FILE="${DEST_FILE}.enc"
+        fi
 
-    echo "Creating dump of ${DB} database from ${POSTGRES_HOST}..."
-    pg_dump $POSTGRES_HOST_OPTS $DB | gzip > $SRC_FILE
+        echo "Uploading dump to $S3_BUCKET"
+        aws $AWS_ARGS s3 cp $SRC_FILE "s3://${S3_BUCKET}${S3_PREFIX}/${DEST_FILE}"
 
-    if [ -n "$ENCRYPTION_PASSWORD" ]; then
-      echo "Encrypting ${SRC_FILE}"
-      openssl enc -aes-256-cbc -in $SRC_FILE -out ${SRC_FILE}.enc -k $ENCRYPTION_PASSWORD
-      rm $SRC_FILE
-      SRC_FILE="${SRC_FILE}.enc"
-      DEST_FILE="${DEST_FILE}.enc"
+        echo "SQL backup uploaded successfully"
+        rm -rf $SRC_FILE
+      done
+      exit 0
     fi
+    ;;
+  mariadb)
+    export MYSQL_PWD=$DB_PASSWORD
+    HOST_OPTS="-h $DB_HOST -P $DB_PORT -u $DB_USER"
 
-    echo "Uploading dump to $S3_BUCKET"
-    aws $AWS_ARGS s3 cp $SRC_FILE "s3://${S3_BUCKET}${S3_PREFIX}/${DEST_FILE}"
+    if [ "$BACKUP_ALL" = "true" ]; then
+      SRC_FILE=dump.sql.gz
+      DEST_FILE=all_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
 
-    echo "SQL backup uploaded successfully"
-    rm -rf $SRC_FILE
-  done
+      echo "Creating dump of all databases from ${DB_HOST}..."
+      mysqldump $HOST_OPTS --single-transaction --all-databases $EXTRA_OPTS | gzip > $SRC_FILE
+    else
+      for DB in $(echo $DB_NAME | tr "," "\n"); do
+        SRC_FILE=dump.sql.gz
+        DEST_FILE=${DB}_$(date +"%Y-%m-%dT%H:%M:%SZ").sql.gz
+
+        echo "Creating dump of ${DB} database from ${DB_HOST}..."
+        mysqldump $HOST_OPTS --single-transaction $EXTRA_OPTS $DB | gzip > $SRC_FILE
+
+        if [ -n "$ENCRYPTION_PASSWORD" ]; then
+          echo "Encrypting ${SRC_FILE}"
+          openssl enc -aes-256-cbc -in $SRC_FILE -out ${SRC_FILE}.enc -k $ENCRYPTION_PASSWORD
+          rm $SRC_FILE
+          SRC_FILE="${SRC_FILE}.enc"
+          DEST_FILE="${DEST_FILE}.enc"
+        fi
+
+        echo "Uploading dump to $S3_BUCKET"
+        aws $AWS_ARGS s3 cp $SRC_FILE "s3://${S3_BUCKET}${S3_PREFIX}/${DEST_FILE}"
+
+        echo "SQL backup uploaded successfully"
+        rm -rf $SRC_FILE
+      done
+      exit 0
+    fi
+    ;;
+  *)
+    echo "Error: Unsupported DB_TYPE '$DB_TYPE' (use 'postgres' or 'mariadb')"
+    exit 1
+    ;;
+esac
+
+# Handle backup-all case (encryption + upload) for both DB types
+if [ -n "$ENCRYPTION_PASSWORD" ]; then
+  echo "Encrypting ${SRC_FILE}"
+  openssl enc -aes-256-cbc -in $SRC_FILE -out ${SRC_FILE}.enc -k $ENCRYPTION_PASSWORD
+  rm $SRC_FILE
+  SRC_FILE="${SRC_FILE}.enc"
+  DEST_FILE="${DEST_FILE}.enc"
 fi
+
+echo "Uploading dump to $S3_BUCKET"
+aws $AWS_ARGS s3 cp $SRC_FILE "s3://${S3_BUCKET}${S3_PREFIX}/${DEST_FILE}"
+
+echo "SQL backup uploaded successfully"
+rm -rf $SRC_FILE

@@ -1,6 +1,6 @@
 # Docker PaaS Platform
 
-A minimal Docker-based Platform as a Service providing reverse proxy with automatic SSL, PostgreSQL database, Valkey cache, and automated S3 backups.
+A minimal Docker-based Platform as a Service providing reverse proxy with automatic SSL, PostgreSQL or MariaDB database, Valkey cache, and automated S3 backups.
 
 ## Prerequisites
 
@@ -16,8 +16,8 @@ A minimal Docker-based Platform as a Service providing reverse proxy with automa
    ```
 
 2. Configure `.env` with your settings:
-   - Domain names
-   - Email for Let's Encrypt
+   - `COMPOSE_FILE` — pick your services (PostgreSQL or MariaDB)
+   - Domain names and email for Let's Encrypt
    - Database credentials
    - S3 backup configuration
 
@@ -37,6 +37,20 @@ A minimal Docker-based Platform as a Service providing reverse proxy with automa
    docker compose up -d
    ```
 
+## Choosing a Database
+
+Set `COMPOSE_FILE` in `.env` to pick PostgreSQL or MariaDB:
+
+```bash
+# PostgreSQL (default)
+COMPOSE_FILE=compose/traefik.yml:compose/postgres.yml:compose/valkey.yml
+
+# MariaDB
+COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml:compose/valkey.yml
+```
+
+Then configure the matching database credentials in `.env`. See `example.env` for details.
+
 ## Configuration
 
 ### Required Environment Variables
@@ -47,10 +61,16 @@ ADMIN_HOSTNAME=admin.yourdomain.com
 ADMIN_EMAIL=you@example.com
 ADMIN_CREDENTIALS=admin:$apr1$hash...
 
-# Database
+# PostgreSQL
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=changeme
 POSTGRES_DB=postgres
+
+# OR MariaDB
+MYSQL_ROOT_PASSWORD=changeme_root
+MYSQL_USER=mariadb
+MYSQL_PASSWORD=changeme
+MYSQL_DATABASE=app
 ```
 
 ### S3 Backup Setup
@@ -82,11 +102,11 @@ See `example.env` for complete provider configurations.
 
 ```bash
 SCHEDULE=@daily
-S3_PREFIX=paas/postgres
+S3_PREFIX=paas/db
 ENCRYPTION_PASSWORD=optional_encryption_key
-POSTGRES_BACKUP_ALL=false
-POSTGRES_EXTRA_OPTS='--schema=public --blobs'
-DROP_PUBLIC=yes  # Restore setting: drops public schema before restore
+BACKUP_ALL=false
+EXTRA_OPTS=
+DROP_PUBLIC=yes  # Restore: drops public schema (PG) or recreates DB (MariaDB)
 ```
 
 ## Adding Applications
@@ -107,16 +127,16 @@ services:
       - traefik.http.routers.myapp.tls.certresolver=letsencrypt
 ```
 
-**Database connection:** Connect to `postgres:5432` on `db-net`
+**Database connection:** `postgres:5432` or `mariadb:3306` on `db-net`
 
-**Valkey connection:** Connect to `valkey:6379` on `db-net`
+**Valkey connection:** `valkey:6379` on `db-net`
 
 ## Make Commands
 
 - `make .env` - Copy environment template
 - `make gen-admin-auth USER=admin PASS=secret` - Generate admin credentials
 - `make set-admin-auth USER=admin PASS=secret` - Update admin credentials in `.env`
-- `make deploy` - Deploy docker-compose.yml, .env, Makefile, and backup/ to remote server (set `SERVER` and `REMOTE_PATH`)
+- `make deploy` - Deploy compose files, .env, Makefile, and backup/ to remote server
 - `make backup` - Trigger an immediate manual backup to S3
 - `make restore` - Restore database from latest S3 backup
 
@@ -128,13 +148,13 @@ To create an immediate backup:
 make backup
 ```
 
-This manually triggers a backup to S3, independent of the scheduled backups. The command displays the database and S3 location before uploading.
+This manually triggers a backup to S3, independent of the scheduled backups.
 
 **Note:** Scheduled backups run automatically based on the `SCHEDULE` setting in `.env` (default: `@daily`).
 
 ## Restoring from Backup
 
-**⚠️ WARNING:** Restore operations destroy existing database data!
+**WARNING:** Restore operations destroy existing database data!
 
 To restore the latest backup from S3:
 
@@ -144,32 +164,28 @@ make restore
 
 The restore process:
 1. Prompts for confirmation (type "YES" to proceed)
-2. Displays target database and S3 location
-3. Stops the postgres-backup service
-4. Downloads and restores the latest backup from S3
-5. Restarts the postgres-backup service
+2. Stops the db-backup service
+3. Downloads and restores the latest backup from S3
+4. Restarts the db-backup service
 
 ### Restore Configuration
 
-Set `DROP_PUBLIC=yes` in `.env` to drop existing schema before restore (default).
-
-**Important:** The restore operation uses the "latest" backup based on file timestamps. Ensure your S3 bucket only contains backups you want to restore.
-
-**Safety Note:** Consider testing restores in a staging environment before production use.
+Set `DROP_PUBLIC=yes` in `.env` to drop existing schema before restore (default). For PostgreSQL this drops the public schema; for MariaDB it drops and recreates the database.
 
 ## Accessing Services
 
 - **Traefik Dashboard:** `https://ADMIN_HOSTNAME` (uses basic auth)
 - **PostgreSQL:** `localhost:5432` (internally: `postgres:5432`)
+- **MariaDB:** `localhost:3306` (internally: `mariadb:3306`)
 - **Valkey:** `localhost:6379` (internally: `valkey:6379`)
 
 ## Services
 
 - **traefik** - Reverse proxy with automatic HTTPS
-- **postgres** - PostgreSQL 18 database
+- **postgres** or **mariadb** - Database (choose via `COMPOSE_FILE`)
 - **valkey** - Redis-compatible cache
-- **postgres-backup** - Custom backup service (built from `backup/`) for automated S3 backups
-- **postgres-restore** - On-demand restore from S3 (run with `make restore`)
+- **db-backup** - Automated S3 backups (built from `backup/`)
+- **db-restore** - On-demand restore from S3 (run with `make restore`)
 
 ## Security
 
