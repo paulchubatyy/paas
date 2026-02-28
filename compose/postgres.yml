@@ -4,7 +4,7 @@ networks:
 
 services:
   postgres:
-    image: postgres:18
+    image: postgres:${POSTGRES_VERSION:-18}
     container_name: shared-postgres
     restart: unless-stopped
     environment:
