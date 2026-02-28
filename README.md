@@ -2,13 +2,29 @@
 
 A minimal Docker-based Platform as a Service providing reverse proxy with automatic SSL, PostgreSQL or MariaDB database, Valkey cache, and automated S3 backups.
 
+## Install
+
+On a fresh Ubuntu 22.04+ server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/paulchubatyy/paas/main/install.sh | bash
+```
+
+The script installs Docker, configures the firewall (UFW + ufw-docker), prompts for your domain, database choice, and credentials, then starts all services.
+
+To install from a fork or branch:
+
+```bash
+PAAS_REPO=https://github.com/you/fork PAAS_BRANCH=dev curl -fsSL ... | bash
+```
+
 ## Prerequisites
 
-- Docker and Docker Compose
+- Ubuntu 22.04+ server
 - Domain name with DNS pointing to your server
-- Apache Bench (for password generation)
+- sudo access
 
-## Quick Start
+## Manual Setup
 
 1. Copy environment template:
    ```bash
