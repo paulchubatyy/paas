@@ -1,0 +1,38 @@
+networks:
+  proxy-net:
+    external: true
+
+services:
+  reverse-proxy:
+    image: traefik:v3
+    container_name: traefik
+    restart: unless-stopped
+    networks:
+      - proxy-net
+    command:
+      - --log.level=INFO
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=proxy-net
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.email=${ADMIN_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../acme:/acme:rw
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dashboard.rule=Host(`${ADMIN_HOSTNAME}`)
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.tls=true
+      - traefik.http.routers.dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.dashboard.middlewares=auth
+      - traefik.http.middlewares.auth.basicauth.users=${ADMIN_CREDENTIALS}

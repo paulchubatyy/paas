@@ -6,14 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A minimal Docker-based Platform as a Service providing:
 - Traefik reverse proxy with automatic Let's Encrypt SSL
-- PostgreSQL 18 database
+- PostgreSQL 18 or MariaDB 11 database (interchangeable)
 - Valkey (Redis-compatible) cache
 - Automated S3 backups with optional encryption
 
 ## Commands
 
 ```bash
-# Setup
+# Fresh server install
+curl -fsSL https://raw.githubusercontent.com/paulchubatyy/paas/main/install.sh | bash
+
+# Manual setup
 make .env                              # Create .env from example.env
 make gen-admin-auth USER=x PASS=y      # Generate admin credentials (append >> .env)
 make set-admin-auth USER=x PASS=y      # Update admin credentials in existing .env
@@ -32,22 +35,33 @@ make deploy SERVER=user@host REMOTE_PATH=paas
 
 ## Architecture
 
+### Per-Service Compose Files
+
+Services are split into `compose/` files, merged via the `COMPOSE_FILE` env var in `.env`:
+
+```env
+# PostgreSQL setup (default)
+COMPOSE_FILE=compose/traefik.yml:compose/postgres.yml:compose/valkey.yml
+
+# MariaDB setup (swap one line)
+COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml:compose/valkey.yml
+```
+
 ### Networks (external, must be created manually)
 - `proxy-net`: Connects Traefik to web-facing services
-- `db-net`: Connects PostgreSQL and Valkey to backend services
+- `db-net`: Connects database and Valkey to backend services
 
-### Services
-- **reverse-proxy (traefik)**: Routes traffic, handles SSL via Let's Encrypt
-- **postgres**: Shared PostgreSQL database (port 5432)
-- **valkey**: Redis-compatible cache (port 6379)
-- **postgres-backup**: Scheduled S3 backups (cron-based, built from `backup/`)
-- **postgres-restore**: On-demand restore (uses `--profile restore`)
+### Compose Files
+- **compose/traefik.yml**: Reverse proxy, SSL via Let's Encrypt, admin dashboard
+- **compose/postgres.yml**: PostgreSQL 18 + db-backup + db-restore services
+- **compose/mariadb.yml**: MariaDB 11 + db-backup + db-restore services
+- **compose/valkey.yml**: Redis-compatible cache
 
 ### Backup System (`backup/` directory)
-Custom Docker image based on postgres:18 with AWS CLI:
-- `backup.sh`: Entry point - runs one-time or schedules via cron
-- `do-backup.sh`: Performs pg_dump, optional encryption, uploads to S3
-- `restore.sh`: Downloads latest backup from S3, decrypts if needed, restores
+Custom Docker image based on debian:bookworm-slim with both pg-client and mariadb-client:
+- `backup.sh`: Entry point - runs one-time or schedules via interval
+- `do-backup.sh`: Branches on `DB_TYPE` — pg_dump or mysqldump, optional encryption, uploads to S3
+- `restore.sh`: Downloads latest backup from S3, decrypts if needed, restores via psql or mysql
 
 Supports multiple S3-compatible providers: AWS S3, Cloudflare R2, DigitalOcean Spaces, Backblaze B2, Wasabi, MinIO.
 
@@ -67,12 +81,16 @@ services:
       - traefik.http.routers.myapp.tls.certresolver=letsencrypt
 ```
 
-Internal hostnames: `postgres:5432`, `valkey:6379`
+Internal hostnames: `postgres:5432` or `mariadb:3306`, `valkey:6379`
+
+## Kanban Board
+
+Default board ID: `br1rYlNG` — use this for all kardbrd queries unless otherwise specified.
 
 ## Pre-commit Hooks
 
 The repo uses pre-commit hooks that:
-- Validate docker-compose.yml syntax
+- Validate compose file syntax
 - Block .env file commits
-- Detect hardcoded passwords/credentials in docker-compose.yml
+- Detect hardcoded passwords/credentials in compose files
 - Check Makefile uses tabs (not spaces)
