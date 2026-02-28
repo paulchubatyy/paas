@@ -2,9 +2,13 @@
 set -euo pipefail
 
 # Override these to install from a fork or different branch:
-#   PAAS_REPO=https://github.com/you/paas PAAS_BRANCH=dev curl ... | bash
+#   PAAS_REPO=https://github.com/you/fork PAAS_BRANCH=dev \
+#     curl -fsSL https://raw.githubusercontent.com/you/fork/dev/install.sh | bash
 PAAS_REPO="${PAAS_REPO:-https://github.com/paulchubatyy/paas}"
 PAAS_BRANCH="${PAAS_BRANCH:-main}"
+
+# Pinned version of ufw-docker (https://github.com/chaifeng/ufw-docker)
+UFW_DOCKER_REF="251123"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -14,15 +18,40 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-log()   { echo -e "${GREEN}[+]${NC} $1"; }
-warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
-error() { echo -e "${RED}[-]${NC} $1" >&2; }
-fatal() { error "$1"; exit 1; }
+log()   { echo -e "${GREEN}[+]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[!]${NC} $*"; }
+error() { echo -e "${RED}[-]${NC} $*" >&2; }
+fatal() { error "$*"; exit 1; }
 
 ask() {
     local prompt="$1" var="$2"
     printf "${BLUE}[?]${NC} %s" "$prompt" >&2
     read -r "${var?}" </dev/tty
+}
+
+ask_secret() {
+    local prompt="$1" var="$2"
+    printf "${BLUE}[?]${NC} %s" "$prompt" >&2
+    read -rs "${var?}" </dev/tty
+    echo >&2
+}
+
+# Safely set key=value in an env file. Handles special characters in values.
+# Replaces existing line (commented or not) in-place, or appends if not found.
+set_env() {
+    local key="$1" value="$2" file="$3"
+    if grep -qE "^#? ?${key}=" "$file"; then
+        KEY="$key" VAL="$value" awk '{
+            if ($0 ~ "^#? ?" ENVIRON["KEY"] "=")
+                print ENVIRON["KEY"] "=" ENVIRON["VAL"]
+            else
+                print
+        }' "$file" > "$file.tmp"
+        chmod --reference="$file" "$file.tmp" 2>/dev/null || true
+        mv "$file.tmp" "$file"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$file"
+    fi
 }
 
 # --- Preflight ---
@@ -87,9 +116,10 @@ setup_ufw() {
     sudo ufw allow 443/tcp >/dev/null 2>&1
     sudo ufw --force enable >/dev/null 2>&1
 
+    # ufw-docker fixes Docker bypassing UFW iptables rules
     if [ ! -f /usr/local/bin/ufw-docker ]; then
         sudo wget -qO /usr/local/bin/ufw-docker \
-            https://github.com/chaifeng/ufw-docker/raw/master/ufw-docker
+            "https://github.com/chaifeng/ufw-docker/raw/${UFW_DOCKER_REF}/ufw-docker"
         sudo chmod +x /usr/local/bin/ufw-docker
     fi
 
@@ -112,11 +142,20 @@ prompt_config() {
     INSTALL_PATH="${INSTALL_PATH:-$default_path}"
 
     # Admin dashboard
+    warn "Make sure DNS for your domain points to this server before continuing."
+    echo ""
+
     ask "Admin dashboard domain (e.g. admin.example.com): " ADMIN_HOSTNAME
     [ -z "$ADMIN_HOSTNAME" ] && fatal "Domain is required."
+    if ! [[ "$ADMIN_HOSTNAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$ ]]; then
+        fatal "Invalid domain: $ADMIN_HOSTNAME"
+    fi
 
     ask "Email for Let's Encrypt certificates: " ADMIN_EMAIL
     [ -z "$ADMIN_EMAIL" ] && fatal "Email is required."
+    if ! [[ "$ADMIN_EMAIL" =~ @ ]]; then
+        fatal "Invalid email: $ADMIN_EMAIL"
+    fi
 
     # Database
     echo ""
@@ -130,18 +169,18 @@ prompt_config() {
             DB_TYPE="postgres"
             ask "PostgreSQL user [postgres]: " PG_USER
             PG_USER="${PG_USER:-postgres}"
-            ask "PostgreSQL password: " PG_PASS
+            ask_secret "PostgreSQL password: " PG_PASS
             [ -z "$PG_PASS" ] && fatal "Password is required."
             ask "PostgreSQL database [postgres]: " PG_DB
             PG_DB="${PG_DB:-postgres}"
             ;;
         2|mariadb|mysql)
             DB_TYPE="mariadb"
-            ask "MariaDB root password: " MYSQL_ROOT_PASS
+            ask_secret "MariaDB root password: " MYSQL_ROOT_PASS
             [ -z "$MYSQL_ROOT_PASS" ] && fatal "Root password is required."
             ask "MariaDB user [mariadb]: " MYSQL_USER
             MYSQL_USER="${MYSQL_USER:-mariadb}"
-            ask "MariaDB user password: " MYSQL_PASS
+            ask_secret "MariaDB user password: " MYSQL_PASS
             [ -z "$MYSQL_PASS" ] && fatal "Password is required."
             ask "MariaDB database [app]: " MYSQL_DB
             MYSQL_DB="${MYSQL_DB:-app}"
@@ -155,7 +194,7 @@ prompt_config() {
     echo ""
     ask "Admin username [admin]: " ADMIN_USER
     ADMIN_USER="${ADMIN_USER:-admin}"
-    ask "Admin password: " ADMIN_PASS
+    ask_secret "Admin password: " ADMIN_PASS
     [ -z "$ADMIN_PASS" ] && fatal "Admin password is required."
 }
 
@@ -186,6 +225,7 @@ generate_env() {
 
     log "Generating .env..."
     cp "$INSTALL_PATH/example.env" "$INSTALL_PATH/.env"
+    chmod 600 "$INSTALL_PATH/.env"
 
     local envfile="$INSTALL_PATH/.env"
 
@@ -195,32 +235,30 @@ generate_env() {
         sed -i 's|^# COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml|COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml|' "$envfile"
     fi
 
-    # Database credentials
+    # Database credentials (set_env handles special characters safely)
     if [ "$DB_TYPE" = "postgres" ]; then
-        sed -i "s|^POSTGRES_USER=.*|POSTGRES_USER=$PG_USER|" "$envfile"
-        sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$PG_PASS|" "$envfile"
-        sed -i "s|^POSTGRES_DB=.*|POSTGRES_DB=$PG_DB|" "$envfile"
+        set_env "POSTGRES_USER" "$PG_USER" "$envfile"
+        set_env "POSTGRES_PASSWORD" "$PG_PASS" "$envfile"
+        set_env "POSTGRES_DB" "$PG_DB" "$envfile"
     else
-        sed -i "s|^# MYSQL_ROOT_PASSWORD=.*|MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASS|" "$envfile"
-        sed -i "s|^# MYSQL_USER=.*|MYSQL_USER=$MYSQL_USER|" "$envfile"
-        sed -i "s|^# MYSQL_PASSWORD=.*|MYSQL_PASSWORD=$MYSQL_PASS|" "$envfile"
-        sed -i "s|^# MYSQL_DATABASE=.*|MYSQL_DATABASE=$MYSQL_DB|" "$envfile"
+        set_env "MYSQL_ROOT_PASSWORD" "$MYSQL_ROOT_PASS" "$envfile"
+        set_env "MYSQL_USER" "$MYSQL_USER" "$envfile"
+        set_env "MYSQL_PASSWORD" "$MYSQL_PASS" "$envfile"
+        set_env "MYSQL_DATABASE" "$MYSQL_DB" "$envfile"
+        # Non-root backup user can't dump all databases
+        set_env "BACKUP_ALL" "false" "$envfile"
     fi
 
-    # Admin dashboard
+    # Admin dashboard — htpasswd reads password from stdin (not visible in ps)
     local admin_creds
-    admin_creds=$(htpasswd -nbB "$ADMIN_USER" "$ADMIN_PASS" | sed 's/\$/\$\$/g')
+    admin_creds=$(printf '%s' "$ADMIN_PASS" | htpasswd -inB "$ADMIN_USER")
 
-    {
-        echo ""
-        echo "# --- Admin dashboard ---"
-        echo "ADMIN_HOSTNAME=$ADMIN_HOSTNAME"
-        echo "ADMIN_EMAIL=$ADMIN_EMAIL"
-        echo "ADMIN_CREDENTIALS=$admin_creds"
-    } >> "$envfile"
+    set_env "ADMIN_HOSTNAME" "$ADMIN_HOSTNAME" "$envfile"
+    set_env "ADMIN_EMAIL" "$ADMIN_EMAIL" "$envfile"
+    set_env "ADMIN_CREDENTIALS" "$admin_creds" "$envfile"
 
-    # Clear the trap encryption password
-    sed -i 's|^ENCRYPTION_PASSWORD=.*|ENCRYPTION_PASSWORD=|' "$envfile"
+    # Clear the encryption password placeholder
+    set_env "ENCRYPTION_PASSWORD" "" "$envfile"
 
     log ".env generated"
 }
@@ -233,10 +271,10 @@ start_services() {
     sudo docker network inspect db-net >/dev/null 2>&1 || sudo docker network create db-net >/dev/null
 
     mkdir -p "$INSTALL_PATH/acme"
+    chmod 700 "$INSTALL_PATH/acme"
 
     log "Starting services..."
-    cd "$INSTALL_PATH"
-    sudo docker compose up -d
+    (cd "$INSTALL_PATH" && sudo docker compose up -d)
 
     log "Services started"
 }
@@ -249,6 +287,7 @@ post_install() {
     echo ""
     echo "  Install path:  $INSTALL_PATH"
     echo "  Dashboard:     https://$ADMIN_HOSTNAME"
+    echo "  Admin user:    $ADMIN_USER"
     echo "  Database:      $DB_TYPE"
     echo ""
     echo -e "${BOLD}Next steps:${NC}"

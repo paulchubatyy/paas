@@ -13,7 +13,10 @@ A minimal Docker-based Platform as a Service providing:
 ## Commands
 
 ```bash
-# Setup
+# Fresh server install
+curl -fsSL https://raw.githubusercontent.com/paulchubatyy/paas/main/install.sh | bash
+
+# Manual setup
 make .env                              # Create .env from example.env
 make gen-admin-auth USER=x PASS=y      # Generate admin credentials (append >> .env)
 make set-admin-auth USER=x PASS=y      # Update admin credentials in existing .env

@@ -15,7 +15,8 @@ The script installs Docker, configures the firewall (UFW + ufw-docker), prompts 
 To install from a fork or branch:
 
 ```bash
-PAAS_REPO=https://github.com/you/fork PAAS_BRANCH=dev curl -fsSL ... | bash
+PAAS_REPO=https://github.com/you/fork PAAS_BRANCH=dev \
+  curl -fsSL https://raw.githubusercontent.com/you/fork/dev/install.sh | bash
 ```
 
 ## Prerequisites
@@ -42,10 +43,11 @@ PAAS_REPO=https://github.com/you/fork PAAS_BRANCH=dev curl -fsSL ... | bash
    make gen-admin-auth USER=admin PASS=securepassword >> .env
    ```
 
-4. Create external networks:
+4. Create external networks and ACME directory:
    ```bash
    docker network create proxy-net
    docker network create db-net
+   mkdir -p acme
    ```
 
 5. Start services:
