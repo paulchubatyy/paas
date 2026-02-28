@@ -167,6 +167,8 @@ prompt_config() {
     case "$DB_CHOICE" in
         1|postgres|pg)
             DB_TYPE="postgres"
+            ask "PostgreSQL version [18]: " DB_VERSION
+            DB_VERSION="${DB_VERSION:-18}"
             ask "PostgreSQL user [postgres]: " PG_USER
             PG_USER="${PG_USER:-postgres}"
             ask_secret "PostgreSQL password: " PG_PASS
@@ -176,6 +178,8 @@ prompt_config() {
             ;;
         2|mariadb|mysql)
             DB_TYPE="mariadb"
+            ask "MariaDB version [11]: " DB_VERSION
+            DB_VERSION="${DB_VERSION:-11}"
             ask_secret "MariaDB root password: " MYSQL_ROOT_PASS
             if [ -z "$MYSQL_ROOT_PASS" ]; then fatal "Root password is required."; fi
             ask "MariaDB user [mariadb]: " MYSQL_USER
@@ -235,12 +239,14 @@ generate_env() {
         sed -i 's|^# COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml:compose/valkey.yml|COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml:compose/valkey.yml|' "$envfile"
     fi
 
-    # Database credentials (set_env handles special characters safely)
+    # Database version and credentials (set_env handles special characters safely)
     if [ "$DB_TYPE" = "postgres" ]; then
+        set_env "POSTGRES_VERSION" "$DB_VERSION" "$envfile"
         set_env "POSTGRES_USER" "$PG_USER" "$envfile"
         set_env "POSTGRES_PASSWORD" "$PG_PASS" "$envfile"
         set_env "POSTGRES_DB" "$PG_DB" "$envfile"
     else
+        set_env "MARIADB_VERSION" "$DB_VERSION" "$envfile"
         set_env "MYSQL_ROOT_PASSWORD" "$MYSQL_ROOT_PASS" "$envfile"
         set_env "MYSQL_USER" "$MYSQL_USER" "$envfile"
         set_env "MYSQL_PASSWORD" "$MYSQL_PASS" "$envfile"
