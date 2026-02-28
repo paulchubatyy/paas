@@ -94,7 +94,7 @@ preflight() {
 install_packages() {
     log "Installing system packages..."
     sudo apt-get update -qq
-    sudo apt-get install -y -qq docker.io docker-compose-v2 apache2-utils ufw wget >/dev/null
+    sudo apt-get install -y -qq docker.io docker-compose-v2 apache2-utils ufw wget curl >/dev/null
 
     sudo systemctl enable --now docker >/dev/null 2>&1
 
@@ -231,8 +231,8 @@ generate_env() {
 
     # COMPOSE_FILE — swap to mariadb if chosen
     if [ "$DB_TYPE" = "mariadb" ]; then
-        sed -i 's|^COMPOSE_FILE=compose/traefik.yml:compose/postgres.yml|# COMPOSE_FILE=compose/traefik.yml:compose/postgres.yml|' "$envfile"
-        sed -i 's|^# COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml|COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml|' "$envfile"
+        sed -i 's|^COMPOSE_FILE=|# COMPOSE_FILE=|' "$envfile"
+        sed -i 's|^# COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml:compose/valkey.yml|COMPOSE_FILE=compose/traefik.yml:compose/mariadb.yml:compose/valkey.yml|' "$envfile"
     fi
 
     # Database credentials (set_env handles special characters safely)
