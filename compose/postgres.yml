@@ -12,9 +12,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     volumes:
-      - postgres_data:/var/lib/postgresql
-    ports:
-      - "5432:5432"
+      - postgres_data:/var/lib/postgresql/data
+    # Uncomment to expose for local development (localhost only):
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    # To expose on all interfaces (WARNING: bypasses host firewall, see README):
+    #   - "5432:5432"
     networks:
       - db-net
     healthcheck:
@@ -33,8 +36,6 @@ services:
         condition: service_healthy
     networks:
       - db-net
-    env_file:
-      - ../.env
     environment:
       DB_TYPE: postgres
       DB_HOST: postgres
@@ -65,8 +66,6 @@ services:
         condition: service_healthy
     networks:
       - db-net
-    env_file:
-      - ../.env
     environment:
       DB_TYPE: postgres
       DB_HOST: postgres

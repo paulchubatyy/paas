@@ -6,7 +6,7 @@
 SERVER := user@example.com
 REMOTE_PATH := paas
 deploy:
-	rsync -avz compose/ .env Makefile backup/ $(SERVER):$(REMOTE_PATH)/
+	rsync -avz compose .env Makefile backup $(SERVER):$(REMOTE_PATH)/
 
 gen-admin-auth:
 	@if [ -z "$(USER)" ] || [ -z "$(PASS)" ]; then \

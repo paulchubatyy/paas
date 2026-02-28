@@ -24,10 +24,10 @@ repos:
         files: '^\.env$'
 
       - id: check-docker-compose-valid
-        name: Validate docker-compose.yml
-        entry: docker compose -f docker-compose.yml config
+        name: Validate compose files
+        entry: docker compose config -q
         language: system
-        files: docker-compose\.yml$
+        files: compose/.*\.yml$
         pass_filenames: false
 
       - id: check-makefile-tabs
@@ -38,15 +38,15 @@ repos:
         pass_filenames: false
 
       - id: check-hardcoded-passwords
-        name: Check for hardcoded passwords in docker-compose
-        entry: bash -c 'if grep -i -E "(password|secret|key|token)\s*[=:]\s*["'"'"'][^"'"'"']+["'"'"']" docker-compose.yml; then echo "Potential hardcoded password found!"; exit 1; fi'
+        name: Check for hardcoded passwords in compose files
+        entry: bash -c 'for f in compose/*.yml; do if grep -i -E "(password|secret|key|token)\s*[=:]\s*["'"'"'][^"'"'"']+["'"'"']" "$f"; then echo "Potential hardcoded password in $f!"; exit 1; fi; done'
         language: system
-        files: docker-compose\.yml$
+        files: compose/.*\.yml$
         pass_filenames: false
 
       - id: check-s3-credentials
-        name: Check for hardcoded S3 credentials in docker-compose
-        entry: bash -c 'if grep -E "(S3_ACCESS_KEY_ID|S3_SECRET_ACCESS_KEY|S3_BUCKET|S3_ENDPOINT)\s*[=:]\s*["'"'"'][^$][^"'"'"']*["'"'"']" docker-compose.yml; then echo "Hardcoded S3 credentials found! Use environment variables (\${S3_*}) instead."; exit 1; fi'
+        name: Check for hardcoded S3 credentials in compose files
+        entry: bash -c 'for f in compose/*.yml; do if grep -E "(S3_ACCESS_KEY_ID|S3_SECRET_ACCESS_KEY|S3_BUCKET|S3_ENDPOINT)\s*[=:]\s*["'"'"'][^$][^"'"'"']*["'"'"']" "$f"; then echo "Hardcoded S3 credentials in $f! Use \${S3_*} variables."; exit 1; fi; done'
         language: system
-        files: docker-compose\.yml$
+        files: compose/.*\.yml$
         pass_filenames: false

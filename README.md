@@ -117,13 +117,15 @@ See `example.env` for complete provider configurations.
 ### Backup Settings
 
 ```bash
-SCHEDULE=@daily
+SCHEDULE=@daily     # @hourly, @daily, @weekly, @monthly, @yearly
 S3_PREFIX=paas/db
-ENCRYPTION_PASSWORD=optional_encryption_key
-BACKUP_ALL=false
+ENCRYPTION_PASSWORD=
+BACKUP_ALL=true
 EXTRA_OPTS=
-DROP_PUBLIC=yes  # Restore: drops public schema (PG) or recreates DB (MariaDB)
+DROP_PUBLIC=yes     # Restore: drops public schema (PG) or recreates DB (MariaDB)
 ```
+
+**Note:** When using MariaDB with `BACKUP_ALL=true`, the backup user needs root privileges. Set `DB_USER` to root in `compose/mariadb.yml` or use `MYSQL_ROOT_PASSWORD` as `DB_PASSWORD`.
 
 ## Adding Applications
 
@@ -191,9 +193,11 @@ Set `DROP_PUBLIC=yes` in `.env` to drop existing schema before restore (default)
 ## Accessing Services
 
 - **Traefik Dashboard:** `https://ADMIN_HOSTNAME` (uses basic auth)
-- **PostgreSQL:** `localhost:5432` (internally: `postgres:5432`)
-- **MariaDB:** `localhost:3306` (internally: `mariadb:3306`)
-- **Valkey:** `localhost:6379` (internally: `valkey:6379`)
+- **PostgreSQL:** `postgres:5432` on `db-net`
+- **MariaDB:** `mariadb:3306` on `db-net`
+- **Valkey:** `valkey:6379` on `db-net`
+
+Database and cache ports are internal-only by default (not published to the host). See compose files for options to expose them.
 
 ## Services
 

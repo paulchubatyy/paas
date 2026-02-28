@@ -22,12 +22,12 @@ esac
 
 echo "Backup schedule: $SCHEDULE (every ${INTERVAL}s)"
 echo "Running initial backup..."
-/do-backup.sh
+/do-backup.sh || echo "Backup failed (exit $?), will retry on next schedule"
 
 echo "Scheduler started. Next backup in ${INTERVAL}s..."
 while true; do
   sleep "$INTERVAL"
   echo "Running scheduled backup..."
-  /do-backup.sh
+  /do-backup.sh || echo "Backup failed (exit $?), will retry on next schedule"
   echo "Next backup in ${INTERVAL}s..."
 done

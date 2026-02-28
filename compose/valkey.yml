@@ -9,7 +9,13 @@ services:
     restart: unless-stopped
     volumes:
       - valkey_data:/data
+    # To enable authentication, add: --requirepass ${VALKEY_PASSWORD}
     command: valkey-server --appendonly yes
+    # Uncomment to expose for local development (localhost only):
+    # ports:
+    #   - "127.0.0.1:6379:6379"
+    # To expose on all interfaces (WARNING: bypasses host firewall, see README):
+    #   - "6379:6379"
     networks:
       - db-net
     healthcheck:
